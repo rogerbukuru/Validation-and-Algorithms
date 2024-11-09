@@ -1,0 +1,131 @@
+---
+title: "Assignment-II"
+author: "Roger Bukuru"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(quadprog)
+library(tidyverse)
+library(e1071)
+
+my_svm <- function(Y, X, gm = 1, cf = 1, dg = 2, cost = 10000) {
+  
+  # Define the polynomial kernel function
+  KK <- function(X1, X2) {
+    return((cf + gm * t(X1) %*% X2)^dg)
+  }
+  
+  # Number of samples
+  N <- length(Y)
+  
+  # Compute the Gram matrix (kernel matrix)
+  DD <- matrix(0, N, N)
+  for (i in 1:N) {
+    for (j in 1:N) {
+      DD[i, j] <- Y[i] * Y[j] * KK(X[i, ], X[j, ])
+    }
+  }
+  
+  # Add a small epsilon to the diagonal for numerical stability
+  eps <- 0.041
+  DD <- DD + eps * diag(N)
+  
+  # Modify constraints for soft-margin
+  Amat <- cbind(Y, diag(N), diag(N) * -1)  # Additional constraints to limit a <= cost
+  bvec <- c(0, rep(0, N), rep(-cost, N))   # Add upper bound of cost
+  
+  d <- matrix(rep(1, N), N, 1)
+  
+  # Adjust the inequality constraint for soft-margin with the cost parameter
+  res <- solve.QP(Dmat = DD, dvec = d, Amat = Amat, bvec = bvec, meq = 1, factorized = FALSE)
+  
+  # Lagrange multipliers (a.k.a. alpha values)
+  a <- pmin(res$solution, cost)  # Cap alphas at cost
+  
+  # Retrieve the support vectors based on non-zero alpha values
+  support_vector_indices <- which(a > 1e-3)
+  support_vectors <- X[support_vector_indices, ]
+  support_labels <- Y[support_vector_indices]
+  support_alphas <- a[support_vector_indices]
+  
+  # Calculate the intercept
+  intercept <- mean(support_labels - rowSums(sapply(1:length(support_alphas), function(i) {
+    support_alphas[i] * support_labels[i] * KK(support_vectors[i, ], t(X))
+  })))
+  
+  # Return a list containing the model parameters
+  return(list(
+    alphas = a,
+    intercept = intercept,
+    support_vectors = support_vectors,
+    support_labels = support_labels
+  ))
+}
+
+# Load and prepare the data
+dat <- read.table("PLA Dynamics.txt")
+
+# Standardize the features
+X <- scale(cbind(dat$X1, dat$X2))
+Y <- dat$Y
+
+# Fit the model
+model <- my_svm(Y = Y, X = X, gm = 1, cf = 1, dg = 2, cost = 10000)
+
+# Plot the results
+plot(X[, 2] ~ X[, 1], pch = c(4, 16)[(Y + 1) / 2 + 1], xlab = "X1", ylab = "X2")
+points(model$support_vectors, pch = 1, col = "red", cex = 2)
+
+# Compare with the e1071 SVM
+svm_model <- svm(Y ~ ., data = data.frame(Y = as.factor(Y), X1 = X[, 1], X2 = X[, 2]),
+                 kernel = "polynomial", degree = 2, gamma = 1, coef0 = 1, cost = 10000, scale = FALSE)
+
+# Output the number of support vectors for each model
+cat("Number of support vectors (my_svm):", length(model$support_vectors) / ncol(X), "\n")
+cat("Number of support vectors (e1071 svm):", length(svm_model$SV), "\n")
+
+
+```
+
+
+
+```{r}
+# Fit the e1071 SVM model
+svm_model <- svm(Y ~ ., data = data.frame(Y = as.factor(Y), X1 = X[, 1], X2 = X[, 2]),
+                 kernel = "polynomial", degree = 2, gamma = 1, coef0 = 1, cost = 10000, scale = FALSE)
+
+# Generate grid for decision boundary
+x1_range <- seq(min(X[, 1]) - 0.5, max(X[, 1]) + 0.5, length.out = 100)
+x2_range <- seq(min(X[, 2]) - 0.5, max(X[, 2]) + 0.5, length.out = 100)
+grid <- expand.grid(X1 = x1_range, X2 = x2_range)
+grid_pred <- predict(svm_model, newdata = grid)
+
+# Plot the original data points
+plot(X, col = ifelse(Y == 1, "blue", "green"), pch = c(4, 16)[(Y + 1) / 2 + 1],
+     xlab = "X1 (Standardized)", ylab = "X2 (Standardized)", main = "SVM Decision Boundary and Support Vectors")
+
+# Add decision boundary
+contour(x1_range, x2_range, matrix(as.numeric(grid_pred), length(x1_range), length(x2_range)), 
+        levels = c(1.5), add = TRUE, col = "black", lwd = 2)
+
+# Add support vectors
+points(svm_model$SV, pch = 16, col = "red", cex = 1.5)
+
+# Legend
+legend("topright", legend = c("Class -1", "Class 1", "Support Vectors"),
+       col = c("green", "blue", "red"), pch = c(4, 16, 16), pt.cex = 1.5)
+```
+
+
+
+```{r}
+
+
+```
