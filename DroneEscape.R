@@ -193,6 +193,7 @@ control = function(xt, theta) {
 #========================================================================
 
 play_a_game = function(theta) {
+  objects <<- draw_objects(J)
   # Draw a random starting position
   xt = draw_starts(1)
   # Play the game
@@ -275,4 +276,31 @@ for (i in 1:dim(xt_try)[1]) {
 
 
 
+
+#========================================================================
+#                Run 100 Simulations for Trace Plots and Performance
+#========================================================================
+
+set.seed(2024)
+J = 50
+
+# Run 100 simulations with trace enabled for trajectories
+xt_try = draw_starts(100)
+res_final = list()
+for (i in 1:100) {
+  current_objects = draw_objects(J)  # New obstacle configuration each time
+  res_final[[i]] = play(xt_try[i,,drop=FALSE], delt, current_objects, rad, theta_hat, plt = TRUE, trace = TRUE)
+}
+
+# Calculate and print success rate
+success_rate = mean(sapply(res_final, function(res) res$status == 1))
+cat("Proportion of successful escapes with random obstacles and start positions:", success_rate, "\n")
+
+# Plot trajectories for each game
+for (i in 1:100) {
+  traj = res_final[[i]]$trajectories
+  for (t in 1:dim(traj)[3]) {
+    lines(traj[,2,t] ~ traj[,1,t], col = 'lightgrey')
+  }
+}
 

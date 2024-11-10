@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
+rm(list = ls())
 library(quadprog)
 library(tidyverse)
 library(e1071)
@@ -22,7 +23,7 @@ my_svm <- function(Y, X, gm = 1, cf = 1, dg = 2, cost = 10000) {
     return((cf + gm * t(X1) %*% X2)^dg)
   }
   
-  # Number of samples
+
   N <- length(Y)
   
   # Compute the Gram matrix (kernel matrix)
@@ -43,7 +44,6 @@ my_svm <- function(Y, X, gm = 1, cf = 1, dg = 2, cost = 10000) {
   
   d <- matrix(rep(1, N), N, 1)
   
-  # Adjust the inequality constraint for soft-margin with the cost parameter
   res <- solve.QP(Dmat = DD, dvec = d, Amat = Amat, bvec = bvec, meq = 1, factorized = FALSE)
   
   # Lagrange multipliers (a.k.a. alpha values)
@@ -60,7 +60,6 @@ my_svm <- function(Y, X, gm = 1, cf = 1, dg = 2, cost = 10000) {
     support_alphas[i] * support_labels[i] * KK(support_vectors[i, ], t(X))
   })))
   
-  # Return a list containing the model parameters
   return(list(
     alphas = a,
     intercept = intercept,
@@ -69,7 +68,7 @@ my_svm <- function(Y, X, gm = 1, cf = 1, dg = 2, cost = 10000) {
   ))
 }
 
-# Load and prepare the data
+
 dat <- read.table("PLA Dynamics.txt")
 
 # Standardize the features
@@ -79,8 +78,8 @@ Y <- dat$Y
 # Fit the model
 model <- my_svm(Y = Y, X = X, gm = 1, cf = 1, dg = 2, cost = 10000)
 
-# Plot the results
-plot(X[, 2] ~ X[, 1], pch = c(4, 16)[(Y + 1) / 2 + 1], xlab = "X1", ylab = "X2")
+
+plot(X[, 2] ~ X[, 1], pch = c(4, 16)[(Y + 1) / 2 + 1], xlab = "X1", ylab = "X2", main="Support Vectors")
 points(model$support_vectors, pch = 1, col = "red", cex = 2)
 
 # Compare with the e1071 SVM
